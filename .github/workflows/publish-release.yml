@@ -27,6 +27,10 @@ jobs:
       - uses: MetaMask/action-publish-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: yarn install
+        run: yarn
+      - name: Build
+        run: yarn build
       - name: Deploy Latest
         uses: peaceiris/actions-gh-pages@068dc23d9710f1ba62e86896f84735d869951305
         with:

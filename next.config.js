@@ -1,10 +1,18 @@
+const package = require('./package.json');
+
+// eslint-disable-next-line node/no-process-env
+const isProduction = process.env.NODE_ENV === 'production';
+
+let assetPrefix;
+let basePath;
+if (isProduction) {
+  assetPrefix = `${package.homepage}/`;
+  basePath = new URL(package.homepage).pathname;
+}
+
 module.exports = {
-  eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors. This allows us to use the MetaMask eslint
-    // config instead of the one nextjs defaults to.
-    // ignoreDuringBuilds: true,
-  },
+  assetPrefix,
+  basePath,
   webpack: (config) => {
     // Important: return the modified config
     return {

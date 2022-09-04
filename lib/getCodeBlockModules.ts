@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs';
 import _glob from 'glob';
 import _webpack from 'webpack';
-import { CodeBlock } from '../pages/guide/[id]';
 
 const readFile = promisify(fs.readFile);
 const glob = promisify(_glob);
@@ -21,6 +20,34 @@ export interface MonacoModule {
   content: string;
   impls: MonacoLib[];
 }
+
+export interface CodeBlockOptions {
+  autorun: boolean;
+  norun: boolean;
+}
+
+export interface CodeBlock {
+  imports: string[];
+  language: Language;
+  options: CodeBlockOptions;
+  webpackBundle?: string;
+  code: string;
+}
+
+const codeBlockRegex = /```([\s\S]*?)\n([\s\S]*?)```$/gmu;
+const importRegex =
+  /(?:(?:(?:import)|(?:export))(?:.)*?from\s+["']([^"']+)["'])|(?:require(?:\s+)?\(["']([^"']+)["']\))|(?:\/+\s+<reference\s+path=["']([^"']+)["']\s+\/>)/gmu;
+
+const languageMap = {
+  typescript: 'ts',
+  javascript: 'js',
+} as { [key: string]: string };
+
+const extractImports = (code: string): string[] => {
+  return Array.from(code.matchAll(importRegex)).map((item) => item[1]);
+};
+
+export type Language = 'js' | 'ts';
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async function (
@@ -75,24 +102,28 @@ export default async function (
   return mods;
 }
 
-type Language = 'typescript' | 'javascript';
+const forceEsm = (source: string): string => {
+  const lines = source.trim().split('\n');
+  for (const line of lines) {
+    if (line.startsWith('import') || line.startsWith('export')) {
+      return source;
+    }
+  }
+
+  return `${source} \n export {};`;
+};
 
 export const getCompiledWebpack = async (
   sourceCode: string,
   language: Language,
-): Promise<any> => {
-  // language to extension
-  const languageToExtension = {
-    typescript: 'ts',
-    javascript: 'js',
-  };
-
+): Promise<string> => {
   // write source code to a temp file
-  const tempFile = `index.${languageToExtension[language] || language || 'js'}`;
+  const tempFile = `index.${language || 'js'}`;
   const tmpPath = await mkdtemp(`codeblock-`);
   await fs.promises.writeFile(
     path.resolve(tmpPath, tempFile),
-    sourceCode,
+    // add export to force webpack::module.type: "javascript/esm"
+    forceEsm(sourceCode),
     'utf8',
   );
   const entry = `./${tmpPath}/${tempFile}`;
@@ -148,4 +179,41 @@ export const getCompiledWebpack = async (
   const result = await readFile(resultPath, 'utf8');
   await rmDir(tmpPath, { recursive: true });
   return result;
+};
+
+export const extractCodeBlocks = async (
+  content: string,
+): Promise<CodeBlock[]> => {
+  const blocks: CodeBlock[] = Array.from(content.matchAll(codeBlockRegex)).map(
+    ([, paramsString, code]) => {
+      const [lang, ...rest] = paramsString.split(' ');
+
+      const opts = {
+        autorun: rest.includes('autorun'),
+        norun: rest.includes('norun'),
+      };
+
+      if (opts.autorun) {
+        opts.norun = true;
+      }
+
+      return {
+        language: (languageMap[lang] || lang) as Language,
+        options: opts,
+        code,
+        imports: extractImports(code),
+      };
+    },
+  );
+
+  for (const block of blocks) {
+    if (['ts', 'js'].includes(block.language)) {
+      block.webpackBundle = await getCompiledWebpack(
+        block.code,
+        block.language,
+      );
+    }
+  }
+
+  return blocks;
 };

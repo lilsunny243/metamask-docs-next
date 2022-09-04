@@ -1,5 +1,6 @@
 ---
 title: "Ethereum Provider API"
+order: 2
 ---
 
 <Tip title="Recommended Reading">
@@ -17,6 +18,30 @@ The presence of the provider object indicates an Ethereum user.
 We recommend using [`@metamask/detect-provider`](https://npmjs.com/package/@metamask/detect-provider) to detect our provider, on any platform or browser.
 
 The Ethereum JavaScript provider API is specified by [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193).
+
+```ruby norun
+class EmailContact
+  include ActiveModel::API
+
+  attr_accessor :name, :email, :message
+  validates :name, :email, :message, presence: true
+
+  def deliver
+    if valid?
+      # deliver email
+    end
+  end
+end
+```
+
+```shell norun
+ls -la
+```
+
+```javascript norun
+const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+const account = accounts[0];
+```
 
 ```typescript
 // This function detects most providers injected at window.ethereum
